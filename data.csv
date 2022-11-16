@@ -1,0 +1,5 @@
+systemTime,ipAddress,clusterHeadSelector,multiPointRelaySelector,linkCost,linkQuality,neighborLinkQuality,
+1668593184,10.79.141.56,True,True,1.795898,1.0,1.0
+1668593187,10.79.141.56,True,True,1.795898,1.0,1.0
+1668593190,10.79.141.56,True,True,1.795898,1.0,1.0
+1668593192,10.79.141.56,True,True,1.795898,1.0,1.0
