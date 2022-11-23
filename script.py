@@ -1,12 +1,24 @@
 import requests
 import json
 import time
+import subprocess
+from fabric import Connection
 
 #open the file for writing with columns name initialized
 file = open("data.csv", 'w')
 columns = 'systemTime,' + 'ipAddress,'+ 'clusterHeadSelector,' + 'multiPointRelaySelector,' +'linkCost,' + 'linkQuality,' + 'neighborLinkQuality,' + 'Connected,\n'
 file.write(columns)
 file.close()
+
+#get the connected node ip
+wirelessdata = subprocess.getoutput("netsh wlan show interfaces")
+ip = wirelessdata[359:369]
+rootaddress = "root@10." + ip
+
+#ssh
+node = Connection(host=rootaddress, connect_kwargs={"password":"root"})
+
+
 
 
 def get_entry():
@@ -27,11 +39,7 @@ def get_entry():
             dictdata = {'Systemtime': str(data['systemTime']), 'ip':str(data['neighbors'][i]['ipAddress']), "Is_cluster": str(data['neighbors'][i]['clusterHeadSelector']) , 'mprs':str(data['neighbors'][i]['multiPointRelaySelector']) \
             , 'linkcost': str(data['links'][i]['linkCost']) ,'LinkQuality':str(data['links'][i]['linkQuality']), 'NQ': str(data['links'][i]['neighborLinkQuality'])}
             
-            temp[str(data['neighbors'][i]['ipAddress'])] = dictdata 
-
-            #we check
-            
-            
+            temp[str(data['neighbors'][i]['ipAddress'])] = dictdata         
             
         #we check
         if prev == {}:
@@ -75,7 +83,13 @@ def to_file_connected(info, file, value):
 
 
 
-
-print("Test 1")
-
 get_entry()
+
+''' import subprocess
+    data = subprocess.getoutput("netsh wlan show interfaces")
+    ip = data[359:369]
+    rootaddress = "root@10." + ip
+    
+
+
+'''
