@@ -1,95 +1,105 @@
 import requests
-import json
 import time
 import subprocess
-from fabric import Connection
+from fabric import Connection # Change try paramiko
+import os
+import re
+import platform
+
 
 #open the file for writing with columns name initialized
-file = open("data.csv", 'w')
-columns = 'systemTime,' + 'ipAddress,'+ 'clusterHeadSelector,' + 'multiPointRelaySelector,' +'linkCost,' + 'linkQuality,' + 'neighborLinkQuality,' + 'Connected,\n'
-file.write(columns)
-file.close()
+
+
+
+class datacollector():
+    def __init__(self):
+        self.osystem = platform.system()
+        self.filename = 0
+        #folder for each session
+        while(os.path.isfile(str(self.filename)+".csv")):
+            self.filename += 1
+        
+        self.columns = 'systemTime,' + 'ipAddress,'+  'multiPointRelaySelector,' +'linkCost,' + 'linkQuality,' + 'neighborLinkQuality,' + 'RSSI value,' + 'AVG RSSI value,'+ 'Connected,\n'
+        
+
+        self.file = None
+        self.ssidreg = "KU-AP.*"
 
 #get the connected node ip
-wirelessdata = subprocess.getoutput("netsh wlan show interfaces")
-ip = wirelessdata[359:369]
-rootaddress = "root@10." + ip
-
-#ssh
-node = Connection(host=rootaddress, connect_kwargs={"password":"root"})
-
-
-
-
-def get_entry():
-    
-    #Open file to append new data
-    file = open("data.csv", 'a')
-
-    
-    prev = dict()
-    
-    for i in range(50): #the number of data we need to collect
-        response = requests.get('http://192.168.10.1:9090/all')
-        data= response.json()
-        temp = dict()
-        for i in range(len(data['neighbors'])): #goes through every neighbor
-            #collect it to temp
-            dictdata = dict()  
-            dictdata = {'Systemtime': str(data['systemTime']), 'ip':str(data['neighbors'][i]['ipAddress']), "Is_cluster": str(data['neighbors'][i]['clusterHeadSelector']) , 'mprs':str(data['neighbors'][i]['multiPointRelaySelector']) \
-            , 'linkcost': str(data['links'][i]['linkCost']) ,'LinkQuality':str(data['links'][i]['linkQuality']), 'NQ': str(data['links'][i]['neighborLinkQuality'])}
-            
-            temp[str(data['neighbors'][i]['ipAddress'])] = dictdata         
-            
-        #we check
-        if prev == {}:
-            prev = temp
-            print("Empty")
-            print(dictdata['Systemtime'])
-        
-        
+        if self.osystem == 'Windows':
+            wirelessdata = subprocess.getoutput("netsh wlan show interfaces")
         else:
-            k=list(prev.keys())
-            for i in k:
-                if i in temp.keys():
-                    #write the entry to file with att=1
-                    to_file_connected(prev[i], file,1)
+           wirelessdata = subprocess.getoutput("iw dev")
 
-                    #update whats on the prev and remove it from temp
-                    prev[i] = temp.pop(i)
+        ip = re.search(self.ssidreg,wirelessdata).group()
+        ip = ip[5::].strip()
 
+        self.rootaddress = "root@10." + ip
+        self.node = Connection(host=self.rootaddress, connect_kwargs={"password":"root"})
+        #wsl
+        self.jsonaddress = 'http://192.168.10.1:9090/all'
+
+
+    def __call__(self):
+        self.get_entry()
+
+    def get_entry(self):
+        try:
+            while (True):
+                t = int(time.time() * 1000.0)
+                response = requests.get(self.jsonaddress)
+                data= response.json()
+                temp = dict()
+
+                stationdata = self.node.run("iw dev wlp1s0 station dump | grep -E 'Station|signal'").stdout.splitlines()
+                #stationdata holds the station data and the signal values
+
+                rssi = int(stationdata[1][stationdata[1].index(':')+1:stationdata[1].index('[')].strip()) # Regex
+                avgrssi = int(stationdata[2][stationdata[2].index(':')+1:stationdata[2].index('[')].strip()) # Regex
+
+                # we take both signal and average signal values
+
+                if (len(data['links'])!=0):
+
+                    dictdata = dict()  
+                    dictdata = {'Systemtime': str(data['systemTime']), 'ip':str(data['neighbors'][0]['ipAddress']), 'mprs':str(data['neighbors'][0]['multiPointRelaySelector']) \
+                    , 'linkcost': str(data['links'][0]['linkCost']) ,'LinkQuality':str(data['links'][0]['linkQuality']), 'NQ': str(data['links'][0]['neighborLinkQuality']),'RSSI': rssi, 'AVGRSSI': avgrssi}
+                    temp[str(data['neighbors'][0]['ipAddress'])] = dictdata
+                    self.to_file_connected(temp, 1)
 
                 else:
-                    #write to file with att=0
-                    to_file_connected(prev[i],file,0)
-                    #pop from prev
-                    prev.pop(i)
+                    #means the node has been disconnected
+                    self.to_file_connected(temp, 0)
+
+                timedelta = int(time.time()*1000.0) - t 
+                time.sleep(2-timedelta/1000.0)
+                print(2-timedelta/1000.0)
+        except KeyboardInterrupt:
+            self.file.close()
+
+    def to_file_connected(self,info,value):
+        #if connection
+        if (value == 1):
+            if self.file is None:
+                self.file = open(str(self.filename)+".csv", 'w')
+                self.file.write(self.columns)
+                self.file.close()
+                self.file = open(str(self.filename)+".csv", 'a')
 
 
-
-            if len(temp) != 0 : #new node connected
-                for i in temp.keys():
-                    prev[i]=temp[i]
-            
-            temp = dict()
-        time.sleep(2)
-
-    file.close()
-
-def to_file_connected(info, file, value):
-    #open file
-    dataToWrite = info['Systemtime']+','+ info['ip'] + ',' + info["Is_cluster"] + ',' + info['mprs'] + ',' + info['linkcost'] + ',' + info['LinkQuality'] + ',' + info['NQ']  + ',' + str(value) + '\n'
-    file.write(dataToWrite)
+            dataToWrite = info['Systemtime']+','+ info['ip'] + ','  + info['mprs'] + ',' + info['linkcost'] + ',' + info['LinkQuality'] + ',' + info['NQ']  + ',' + str(info['RSSI']) + ','  + str(info['AVGRSSI'])  + ',' + str(value) + '\n'
+            self.file.write(dataToWrite)
+        #if no connection (disconnection or we havent started yet)
+        else:
+            #there is no link data/ the node just disconnected
+            if self.file is not None:
+                dataToWrite = info['Systemtime']+','+ str(0) + ','  + info['mprs'] + ',' + info['linkcost'] + ',' + info['LinkQuality'] + ',' + info['NQ']  + ',' + str(info['RSSI']) + ','  + str(info['AVGRSSI'])  + ',' + str(value) + '\n'
+                self.file.write(dataToWrite)
+                self.file.close()
+                self.file = None
+                self.filename += 1
 
 
-
-get_entry()
-
-''' import subprocess
-    data = subprocess.getoutput("netsh wlan show interfaces")
-    ip = data[359:369]
-    rootaddress = "root@10." + ip
-    
-
-
-'''
+if __name__=="__main__":
+    datacollect = datacollector()
+    datacollect()
