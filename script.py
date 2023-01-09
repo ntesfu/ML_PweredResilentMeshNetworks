@@ -60,7 +60,7 @@ class datacollector():
                 response = requests.get(self.jsonaddress)
                 data= response.json()
                 temp = dict()
-
+                stationdata = []
                 stationdata = self.node.run("iw dev wlp1s0 station dump | grep -E 'Station|signal'").stdout.splitlines()
                 #stationdata holds the station data and the signal values
                 rssi = dict()
@@ -79,6 +79,7 @@ class datacollector():
 
                 if (len(data['links'])!=0):
                     for i in data['links']:
+                        print(i['remoteIP'])
                         
                         dictdata = dict()  
                         dictdata = {'Systemtime': str(data['systemTime']), 'ip':str(i['remoteIP']), 'mprs':str(data['neighbors'][0]['multiPointRelaySelector']) \
@@ -88,7 +89,7 @@ class datacollector():
                         self.links[str(i['remoteIP'])] = 1
 
 
-                    links = self.links.keys()
+                    links = [i for i in self.links.keys()]
 
                     for i in links:
                         if self.links[i] ==0:
@@ -98,10 +99,11 @@ class datacollector():
 
                 else:
                     #just close the files
-                    #means the node has been disconnected
+                    #means all the nodes have been disconnected
                     #self.to_file_connected(temp, 0)
-                    for i in self.file:
-                        self.file[i].close()
+                    links = [i for i in self.file.keys()]
+                    for i in links:
+                        self.to_file_connected(None, 0,str(i))
 
                 timedelta = int(time.time()*1000.0) - t 
                 time.sleep(2-timedelta/1000.0)
@@ -114,11 +116,12 @@ class datacollector():
         #if connection
         if (value == 1):
             if ip not in self.file:
-                self.filename +=1
+                print("opening a file!!!!")
                 self.file[ip] = open(str(self.filename)+".csv", 'w')
                 self.file[ip].write(self.columns)
                 self.file[ip].close()
                 self.file[ip] = open(str(self.filename)+".csv", 'a')
+                self.filename +=1
 
             
             dataToWrite = info[ip]['Systemtime']+','+ info[ip]['ip'] + ','  + info[ip]['mprs'] + ',' + info[ip]['linkcost'] + ',' + info[ip]['LinkQuality'] + ',' + info[ip]['NQ']  + ',' + str(info[ip]['RSSI']) + ','  + str(info[ip]['AVGRSSI'])  + ',' + str(value) + '\n'
