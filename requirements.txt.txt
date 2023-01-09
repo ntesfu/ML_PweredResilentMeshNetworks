@@ -1,0 +1,7 @@
+numpy
+tensorflow
+matplotlib
+pandas
+IPython
+requests
+fabric
