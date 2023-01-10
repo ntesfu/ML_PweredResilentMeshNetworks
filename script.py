@@ -5,6 +5,7 @@ from fabric import Connection # Change try paramiko
 import os
 import re
 import platform
+from datetime import date
 
 
 #open the file for writing with columns name initialized
@@ -12,11 +13,22 @@ import platform
 
 
 class datacollector():
+
     def __init__(self):
+        self.scenario = input("Enter the scenario:")
+        answer = 'n'
+        while answer!='y':
+            if (os.path.isdir(self.scenario)):
+                answer = input(f"The folder {self.scenario} exists do you want to continue writing to it (y,n)?")
+                if answer == 'n': self.scenario = input("Enter the scenario:")
+            else:
+                os.mkdir(self.scenario)
+                break
+
         self.osystem = platform.system()
         self.filename = 0
         #folder for each session
-        while(os.path.isfile(str(self.filename)+".csv")):
+        while(os.path.isfile(os.path.join(self.scenario,str(self.filename))+".csv")):
             self.filename += 1
         
         self.columns = 'systemTime,' + 'ipAddress,'+  'multiPointRelaySelector,' +'linkCost,' + 'linkQuality,' + 'neighborLinkQuality,' + 'RSSI value,' + 'AVG RSSI value,'+ 'Connected,\n'
@@ -44,6 +56,8 @@ class datacollector():
         self.macentry['10.79.141.204'] = '00:30:1a:4f:8d:cc'
         self.macentry['10.79.141.55'] = '00:30:1a:4f:8d:37'
         self.macentry['10.79.141.35'] = '00:30:1a:4f:8d:23'
+        self.macentry['10.79.141.25'] = '00:30:1a:4f:8d:19'
+        self.macentry['10.79.141.53'] = '00:30:1a:4f:8d:35'
         
 
 
@@ -106,8 +120,9 @@ class datacollector():
                         self.to_file_connected(None, 0,str(i))
 
                 timedelta = int(time.time()*1000.0) - t 
+                print(f"took {timedelta/1000.0} seconds to complete the request")
                 time.sleep(2-timedelta/1000.0)
-                print(2-timedelta/1000.0)
+                
         except KeyboardInterrupt:
             for i in self.file:
                 self.file[i].close()
@@ -117,10 +132,10 @@ class datacollector():
         if (value == 1):
             if ip not in self.file:
                 print("opening a file!!!!")
-                self.file[ip] = open(str(self.filename)+".csv", 'w')
+                self.file[ip] = open(os.path.join(self.scenario,str(self.filename))+".csv", 'w')
                 self.file[ip].write(self.columns)
                 self.file[ip].close()
-                self.file[ip] = open(str(self.filename)+".csv", 'a')
+                self.file[ip] = open(os.path.join(self.scenario,str(self.filename))+".csv", 'a')
                 self.filename +=1
 
             
