@@ -71,57 +71,73 @@ class datacollector():
                 for i in self.links:
                     self.links[i] = 0
                 t = int(time.time() * 1000.0)
-                response = requests.get(self.jsonaddress)
-                data= response.json()
-                temp = dict()
-                stationdata = []
-                stationdata = self.node.run("iw dev wlp1s0 station dump | grep -E 'Station|signal'").stdout.splitlines()
-                #stationdata holds the station data and the signal values
-                rssi = dict()
-                avgrssi = dict()
+                try:
+                    response = requests.get(self.jsonaddress, timeout=2)
+                    response.raise_for_status()
+                
+                    if response.status_code != 200:
+                        print("*************  \n\n\n ******************")
+                        continue
+                    data= response.json()
+                    temp = dict()
+                    stationdata = []
+                    stationdata = self.node.run("iw dev wlp1s0 station dump | grep -E 'Station|signal'").stdout.splitlines()
+                    #stationdata holds the station data and the signal values
+                    rssi = dict()
+                    avgrssi = dict()
 
-                for i in range(0,len(stationdata),3):
-                    #get the mac address
-                    mac = stationdata[i][stationdata[i].index('n')+1:stationdata[i].index('(')].strip()
-                    print(mac)
-
-
-                    rssi[mac] = int(stationdata[i+1][stationdata[i+1].index(':')+1:stationdata[i+1].index('[')].strip()) # Regex
-                    avgrssi[mac] = int(stationdata[i+2][stationdata[i+2].index(':')+1:stationdata[i+2].index('[')].strip()) # Regex
-
-                # we take both signal and average signal values
-
-                if (len(data['links'])!=0):
-                    for i in data['links']:
-                        print(i['remoteIP'])
-                        
-                        dictdata = dict()  
-                        dictdata = {'Systemtime': str(data['systemTime']), 'ip':str(i['remoteIP']), 'mprs':str(data['neighbors'][0]['multiPointRelaySelector']) \
-                        , 'linkcost': str(i['linkCost']) ,'LinkQuality':str(i['linkQuality']), 'NQ': str(i['neighborLinkQuality']),'RSSI': rssi[self.macentry[str(i['remoteIP'])]], 'AVGRSSI': avgrssi[self.macentry[str(i['remoteIP'])]]}
-                        temp[str(i['remoteIP'])] = dictdata
-                        self.to_file_connected(temp, 1,str(i['remoteIP']))
-                        self.links[str(i['remoteIP'])] = 1
+                    for i in range(0,len(stationdata),3):
+                        #get the mac address
+                        mac = stationdata[i][stationdata[i].index('n')+1:stationdata[i].index('(')].strip()
 
 
-                    links = [i for i in self.links.keys()]
+                        rssi[mac] = int(stationdata[i+1][stationdata[i+1].index(':')+1:stationdata[i+1].index('[')].strip()) # Regex
+                        avgrssi[mac] = int(stationdata[i+2][stationdata[i+2].index(':')+1:stationdata[i+2].index('[')].strip()) # Regex
 
-                    for i in links:
-                        if self.links[i] ==0:
+                    # we take both signal and average signal values
+
+                    if (len(data['links'])!=0):
+                        for i in data['links']:
+                            print(i['remoteIP'])
+                            
+                            dictdata = dict()  
+                            if (self.macentry[str(i['remoteIP'])] in rssi.keys()):
+                                dictdata = {'Systemtime': str(data['systemTime']), 'ip':str(i['remoteIP']), 'mprs':str(data['neighbors'][0]['multiPointRelaySelector']) \
+                                , 'linkcost': str(i['linkCost']) ,'LinkQuality':str(i['linkQuality']), 'NQ': str(i['neighborLinkQuality']),'RSSI': rssi[self.macentry[str(i['remoteIP'])]], 'AVGRSSI': avgrssi[self.macentry[str(i['remoteIP'])]]}
+                            
+                            else:
+                                dictdata = {'Systemtime': str(data['systemTime']), 'ip':str(i['remoteIP']), 'mprs':str(data['neighbors'][0]['multiPointRelaySelector']) \
+                                , 'linkcost': str(i['linkCost']) ,'LinkQuality':str(i['linkQuality']), 'NQ': str(i['neighborLinkQuality']),'RSSI': None, 'AVGRSSI': None}
+                            
+
+                            temp[str(i['remoteIP'])] = dictdata
+                            self.to_file_connected(temp, 1,str(i['remoteIP']))
+                            self.links[str(i['remoteIP'])] = 1
+
+
+                        links = [i for i in self.links.keys()]
+
+                        for i in links:
+                            if self.links[i] ==0:
+                                self.to_file_connected(None, 0,str(i))
+                                self.links.pop(i)
+
+
+                    else:
+                        #just close the files
+                        #means all the nodes have been disconnected
+                        #self.to_file_connected(temp, 0)
+                        links = [i for i in self.file.keys()]
+                        for i in links:
                             self.to_file_connected(None, 0,str(i))
-                            self.links.pop(i)
 
-
-                else:
-                    #just close the files
-                    #means all the nodes have been disconnected
-                    #self.to_file_connected(temp, 0)
-                    links = [i for i in self.file.keys()]
-                    for i in links:
-                        self.to_file_connected(None, 0,str(i))
-
-                timedelta = int(time.time()*1000.0) - t 
-                print(f"took {timedelta/1000.0} seconds to complete the request")
-                time.sleep(2-timedelta/1000.0)
+                    timedelta = int(time.time()*1000.0) - t 
+                    print(f"took {timedelta/1000.0} seconds to complete the request")
+                    time.sleep(2-timedelta/1000.0)
+                
+                except Exception as e:
+                    print(e.args)
+                    continue
                 
         except KeyboardInterrupt:
             for i in self.file:
