@@ -1,0 +1,6 @@
+systemTime,ipAddress,multiPointRelaySelector,linkCost,linkQuality,neighborLinkQuality,RSSI value,AVG RSSI value,Connected,
+1675408992,10.79.141.23,True,1.838867,1.0,1.0,-34,-33,1
+1675408992,10.79.141.23,True,1.838867,1.0,1.0,-34,-33,1
+1675408994,10.79.141.23,True,1.838867,1.0,1.0,-34,-33,1
+1675408996,10.79.141.23,True,1.838867,1.0,1.0,-33,-33,1
+1675408998,10.79.141.23,True,1.838867,1.0,1.0,-35,-33,1
