@@ -11,7 +11,8 @@ from multiprocessing import Process, Manager
 
 lossreg = "unreachable"
 lossreg2 = "100% loss"
-lossreg3 = "Request timed out."
+loss_percent_reg = "Lost.*" 
+#lossreg3 = "Request timed out."
 
 
 
@@ -208,17 +209,19 @@ def pingnodes(Connected_links,string_ip):
         
         ip = string_ip
         while(True):
-            command = f"ping {ip} -w 1000 -n 6"
-            print(f"Pinging {ip}")
+            command = f"ping {ip} -w 600 -n 5"
+            #print(f"Pinging {ip}")
             output = subprocess.getoutput(command)
             checkout2 = re.search(lossreg2,output)
             checkout = re.search(lossreg,output)
-            checkout3 = re.search(lossreg3,output)
-            if checkout is not None or checkout2 is not None or checkout3 is not None:
+            loss_percent = re.search(loss_percent_reg,output).group()
+            print(loss_percent[10:-8])
+            #checkout3 = re.search(lossreg3,output)
+            if checkout is not None:# or checkout3 is not None:
                 print(f"{ip} has been disconnected")
                 Connected_links[str(ip)] = 0
-            elif checkout is None and checkout2 is None and checkout3 is None:
-                Connected_links[str(ip)] = 1
+            else:# and checkout3 is None:
+                Connected_links[str(ip)] = 1- int(loss_percent[10:-8])/100
     except KeyboardInterrupt:
         print("+++++++++++++++++=========Stopping pinging devices=========+++++++++++++++")
 
